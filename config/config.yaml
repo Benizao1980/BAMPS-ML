@@ -1,0 +1,39 @@
+antibiotics:
+- amikacin
+- gentamicin
+- tobramycin
+- sulbactam
+- imipenem
+- meropenem
+- ciprofloxacin
+- tigecycline
+- trimethoprim-sulfamethoxazole
+- colistin
+breakpoint_standard: EUCAST
+genome_dir: data/Test_contigs88
+gwas:
+  correction: FDR
+  pval_threshold: 1.0e-05
+metadata_file: data/metadata.tsv
+mic_file: data/mic_values_test88.csv
+mic_thresholds:
+  ciprofloxacin:
+    I: 0.5
+    R: 1
+    S: 0.25
+  colistin:
+    R: 4
+    S: 2
+  imipenem:
+    I: 4
+    R: 8
+    S: 2
+  meropenem:
+    I: 4
+    R: 8
+    S: 2
+ml:
+  bootstrap_reps: 100
+  model_type: xgboost
+  test_size: 0.2
+reference_dir: data/reference_genomes/
