@@ -53,3 +53,19 @@ Outputs are written to `outputs/runs/.../` including:
 ## Status
 
 This repository contains code and documentation used for the *A. baumannii* AMR prediction study (Pascoe & Mourkas et al., in preparation). It is actively being cleaned and documented; optional feature views (gene content, unitigs/GWAS, mobile elements) are present but may still be under refinement.
+
+## Known issues / platform notes
+
+* **XGBoost on older glibc (e.g. Puma)**
+  You may see a warning that your system has `glibc < 2.28` and that future XGBoost wheels may stop supporting it.
+
+  * This is a *warning*, not an error, but it may become a breaking issue with future XGBoost releases.
+  * Recommended workaround on older systems: use `--classifier lgbm` (LightGBM) or `--classifier ridge` for regression baselines.
+  * If you need XGBoost specifically, pin to a compatible version in your environment (e.g. via conda), and record versions in `outputs/runs/<run>/versions.txt`.
+
+* **Antibiotic “panel” behaviour**
+  `scripts/train_model.py` trains **one model per antibiotic column** in the MIC/phenotype table (after dropping missing labels per antibiotic).
+  This is why a single run produces multiple `*_regression.pkl` files plus `training_summary.tsv`.
+
+* **Label sparsity drives performance**
+  Some antibiotics may have substantially fewer usable labels (e.g. tobramycin), which will reduce stability and inflate uncertainty. Always report `n` per antibiotic (captured in `training_summary.tsv`).
