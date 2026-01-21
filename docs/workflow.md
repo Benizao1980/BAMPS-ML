@@ -254,7 +254,7 @@ Figshare: validation dataset [contigs]
 Microreact: dataset
 Microreact: validation dataset
 Microreact: Global prediction dataset
-IOI Collections: *A. baumanii*
+IOI Collections: [*A. baumanii*](https://bioinf.ineosoxford.ox.ac.uk/bigsdb?db=ioi_abaumannii_isolates)
 PubMLST database (*A. baumanii*)
 
 ---
