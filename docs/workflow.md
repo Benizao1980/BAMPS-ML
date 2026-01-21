@@ -163,35 +163,51 @@ A single shell script that reproduces the golden path with variables at the top 
 # VALIDATE A MODEL
 ---
 
-Validation dataset: IOI collection (add link)
+A validation dataset of sequenced genomes, with correspondign MIC data was downloaded from the [Acinetobacter baumannii IOI Collection v1 database](https://bioinf.ineosoxford.ox.ac.uk/bigsdb?db=ioi_abaumannii_isolates) (n=672; login required)
 
 ## Input
-- contigs
-- phenotype: S/R or MIC
-- model.pkl
+- validation contigs: data/contigs_validation_dataset/
+- validation phenotypes: looks like data/mic_values_test88.csv (id column must match contig id)
+- trained models: outputs/runs/001_.../models/*_regression.pkl
 
-Download contigs here: 
+You can also download the contigs from here: 
 
 ```bash
 wget link to dataset contigs on figshare
 ```
 
-## Use constructed model to make predictions 
-
-Using prediction script
+### Step A — Build AMRFinder features for validation contigs
 
 ```bash
-how to run it
+python scripts/run_amrfinder.py \
+    --genome-dir data/contigs_validation_dataset/validation_dataset_MIC.csv \
+    --output-dir outputs/amrfinder/validation \
+    --threads 8
 ```
 
-## Outputs:
--
--
--
+This will produce: `outputs/amrfinder/validation/amr_presence_absence.norm.tsv`
 
-Compare with KNOWN profiles / MIC
-Self test?
-Metrics
+### Step B — Predict MICs on validation isolates using trained models
+
+You’ve got multiple prediction entrypoints (predict.py, predict_all.py, plus the uploaded predict_mic.py). The “right” one is whichever supports:
+
+- `--feature-table` ...
+- `--model-dir` ...
+- output TSV per antibiotic (or a combined table)
+
+```bashv
+python scripts/predict_all.py \
+  --feature-table outputs/amrfinder/Validation88/amr_presence_absence.norm.tsv \
+  --model-dir outputs/runs/001_Russia280_AMRFinder_MIC_panel_xgb/models \
+  --out preds/Validation88_preds_mic.tsv
+```
+
+### Step C — Score predictions against known validation MICs
+
+Minimum “paper-grade” validation metrics to compute per antibiotic:
+- R² (on log2 MIC)
+- MAE (in log2 units)
+- Within ±1 dilution accuracy (great for posters/talks)
 
 ## (optional) Compare hybrid models
 
