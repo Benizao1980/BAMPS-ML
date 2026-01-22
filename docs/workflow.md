@@ -160,54 +160,107 @@ Add `scripts/run_golden_path.sh`
 A single shell script that reproduces the golden path with variables at the top (so you don’t retype commands).
 
 ---
-# VALIDATE A MODEL
+FEATURE DISCOVERY
+---
+
+GWAS x3
+Combine
+BLAST in genomes
+Buidling a hybrid model
+
+---
+# VALIDATE MODEL
 ---
 
 A validation dataset of sequenced genomes, with correspondign MIC data was downloaded from the [Acinetobacter baumannii IOI Collection v1 database](https://bioinf.ineosoxford.ox.ac.uk/bigsdb?db=ioi_abaumannii_isolates) (n=672; login required)
 
 ## Input
-- validation contigs: data/contigs_validation_dataset/
-- validation phenotypes: looks like data/mic_values_test88.csv (id column must match contig id)
-- trained models: outputs/runs/001_.../models/*_regression.pkl
+- validation contigs: `data/contigs_validation_dataset/`
+- validation phenotypes (truth MICs): `data/phenotypes_validation/validation_dataset_MIC.csv`
+  - must include an ID column matching contig IDs (or whatever ID BAMPS uses)
+- trained models: `outputs/runs/001_.../models/*_regression.pkl`
+- optional model training summary: `outputs/runs/001_.../models/training_summary.tsv`
 
-You can also download the contigs from here: 
+You can also download the contigs from here:
 
 ```bash
-wget link to dataset contigs on figshare
+wget -c https://figshare.com/ndownloader/files/61226248?private_link=5e5b1065edad79c38c3a
 ```
 
 ### Step A — Build AMRFinder features for validation contigs
 
 ```bash
 python scripts/run_amrfinder.py \
-    --genome-dir data/contigs_validation_dataset/validation_dataset_MIC.csv \
-    --output-dir outputs/amrfinder/validation \
-    --threads 8
+  --genome-dir data/contigs_validation_dataset \
+  --output-dir outputs/amrfinder/validation \
+  --threads 8
 ```
 
-This will produce: `outputs/amrfinder/validation/amr_presence_absence.norm.tsv`
+This produces (example):
+- `outputs/amrfinder/validation/amr_presence_absence.tsv`
 
 ### Step B — Predict MICs on validation isolates using trained models
 
-You’ve got multiple prediction entrypoints (predict.py, predict_all.py, plus the uploaded predict_mic.py). The “right” one is whichever supports:
+**Batch prediction + plots + metrics (recommended)**
 
-- `--feature-table` ...
-- `--model-dir` ...
-- output TSV per antibiotic (or a combined table)
+This will:
+- generate one tidy TSV per antibiotic (preds/preds_<antibiotic>_mic.tsv)
+- generate a MIC panel plot (preds/validation_MIC_panel.png + .svg)
+- compute paper-grade metrics per antibiotic (preds/validation_metrics.tsv)
+- optionally generate lineage-stratified panels if `--lineage-col` is provided
 
-```bashv
+```bash
 python scripts/predict_all.py \
-  --feature-table outputs/amrfinder/Validation88/amr_presence_absence.norm.tsv \
+  --feature-table outputs/amrfinder/validation/amr_presence_absence.tsv \
   --model-dir outputs/runs/001_Russia280_AMRFinder_MIC_panel_xgb/models \
-  --out preds/Validation88_preds_mic.tsv
+  --outdir preds \
+  --tasks regression \
+  --to-mic \
+  --panel-out preds/validation_MIC_panel \
+  --panel-truth data/phenotypes_validation/validation_dataset_MIC.csv \
+  --metrics-out preds/validation_metrics.tsv \
+  --lineage-col lineage \
+  --top-lineages 6
+```
+
+If your feature table does not have an explicit sample/id column, pass `--id-col`:
+
+```bash
+python scripts/predict_all.py ... --id-col <column_name>
+```
+
+**Single antibiotic (regression; MIC)**
+
+```bash
+python scripts/predict.py \
+  --feature-table outputs/amrfinder/validation/amr_presence_absence.tsv \
+  --model-dir outputs/runs/001_Russia280_AMRFinder_MIC_panel_xgb/models \
+  --antibiotic imipenem \
+  --task regression \
+  --to-mic \
+  --output preds/preds_imipenem_mic.tsv
+```
+
+**Single antibiotic (classification; S/I/R)**
+
+```bash
+python scripts/predict.py \
+  --feature-table outputs/amrfinder/validation/amr_presence_absence.tsv \
+  --model-dir outputs/runs/001_Russia280_AMRFinder_MIC_panel_xgb/models \
+  --antibiotic imipenem \
+  --task classification \
+  --output preds/preds_imipenem_SIR.tsv
 ```
 
 ### Step C — Score predictions against known validation MICs
+The pipeline writes preds/validation_metrics.tsv with per-antibiotic validation performance.
 
-Minimum “paper-grade” validation metrics to compute per antibiotic:
-- R² (on log2 MIC)
-- MAE (in log2 units)
-- Within ±1 dilution accuracy (great for posters/talks)
+Minimum “paper-grade” validation metrics per antibiotic:
+-R² on log2(MIC) (regression goodness-of-fit)
+- MAE in log2 units (average error in dilution steps)
+- Within ±1 dilution accuracy (clinically intuitive)
+
+These metrics are also auto-embedded into the MIC panel plot when available.
 
 ## (optional) Compare hybrid models
 
