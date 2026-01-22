@@ -174,6 +174,10 @@ Buidling a hybrid model
 
 A validation dataset of sequenced genomes, with correspondign MIC data was downloaded from the [Acinetobacter baumannii IOI Collection v1 database](https://bioinf.ineosoxford.ox.ac.uk/bigsdb?db=ioi_abaumannii_isolates) (n=672; login required)
 
+figures/validation_dataset.png
+
+**Figure X:** Dashbaord overview of validation dataset.
+
 ## Input
 - validation contigs: `data/contigs_validation_dataset/`
 - validation phenotypes (truth MICs): `data/phenotypes_validation/validation_dataset_MIC.csv`
