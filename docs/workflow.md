@@ -178,18 +178,30 @@ A validation dataset of sequenced genomes, with correspondign MIC data was downl
 
 **Figure X:** Dashbaord overview of validation dataset.
 
+This validation step quantifies:
+- Absolute MIC prediction accuracy
+- Improvement from ML vs rule-based AMR
+- Added value of GWAS-derived determinants
+- Lineage-specific performance gains
+
 ## Input
-- validation contigs: `data/contigs_validation_dataset/`
-- validation phenotypes (truth MICs): `data/phenotypes_validation/validation_dataset_MIC.csv`
-  - must include an ID column matching contig IDs (or whatever ID BAMPS uses)
-- trained models: `outputs/runs/001_.../models/*_regression.pkl`
-- optional model training summary: `outputs/runs/001_.../models/training_summary.tsv`
+- Validation contigs: `data/contigs_validation_dataset/`
+- Validation phenotypes (MICs): `data/phenotypes_validation/validation_dataset_MIC.csv`
+  - Supported formats:
+    - **wide**: one row per sample, MIC columns per antibiotic (e.g., `imipenem`, `meropenem`, ...)
+    - **long**: columns `sample`, `antibiotic`, `mic`
+- Trained models: `outputs/runs/<RUN_NAME>/models/*_regression.pkl`
 
 You can also download the contigs from here:
 
 ```bash
+cd /<your_location>/BAMPS_ML/data
+
 wget -c https://figshare.com/ndownloader/files/61226248?private_link=5e5b1065edad79c38c3a
+tar -zxfv contigs_validation.tar.gz
 ```
+
+The plotting/metrics script auto-detects wide vs long and standardises internally.
 
 ### Step A — Build AMRFinder features for validation contigs
 
@@ -201,17 +213,13 @@ python scripts/run_amrfinder.py \
 ```
 
 This produces (example):
-- `outputs/amrfinder/validation/amr_presence_absence.tsv`
+- ``outputs/amrfinder/validation/amr_presence_absence.tsv``
 
 ### Step B — Predict MICs on validation isolates using trained models
 
-**Batch prediction + plots + metrics (recommended)**
+**Batch prediction + plots + metrics**
 
-This will:
-- generate one tidy TSV per antibiotic (preds/preds_<antibiotic>_mic.tsv)
-- generate a MIC panel plot (preds/validation_MIC_panel.png + .svg)
-- compute paper-grade metrics per antibiotic (preds/validation_metrics.tsv)
-- optionally generate lineage-stratified panels if `--lineage-col` is provided
+This writes one tidy TSV per antibiotic (prefixed ``preds_...``) and generates MIC panel plots.
 
 ```bash
 python scripts/predict_all.py \
@@ -227,11 +235,11 @@ python scripts/predict_all.py \
   --top-lineages 6
 ```
 
-If your feature table does not have an explicit sample/id column, pass `--id-col`:
-
-```bash
-python scripts/predict_all.py ... --id-col <column_name>
-```
+Outputs: 
+- preds/preds_<antibiotic>_mic.tsv (one per antibiotic)
+- preds/validation_MIC_panel.png + .svg
+- preds/validation_metrics.tsv (per-antibiotic validation metrics)
+- Optional lineage-stratified panels: preds/validation_MIC_panel.lineage_<X>.png + .svg (top N lineages)
 
 **Single antibiotic (regression; MIC)**
 
@@ -257,14 +265,14 @@ python scripts/predict.py \
 ```
 
 ### Step C — Score predictions against known validation MICs
-The pipeline writes preds/validation_metrics.tsv with per-antibiotic validation performance.
+The pipeline writes ``preds/validation_metrics.tsv`` with per-antibiotic validation performance.
 
 Minimum “paper-grade” validation metrics per antibiotic:
--R² on log2(MIC) (regression goodness-of-fit)
+- R² on log2(MIC) (regression goodness-of-fit)
 - MAE in log2 units (average error in dilution steps)
 - Within ±1 dilution accuracy (clinically intuitive)
 
-These metrics are also auto-embedded into the MIC panel plot when available.
+These are also auto-embedded into the MIC panel figure annotations (per antibiotic).
 
 ## (optional) Compare hybrid models
 
