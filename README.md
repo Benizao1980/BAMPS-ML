@@ -2,7 +2,9 @@
 
 **BAMPS-ML** is a reproducible machine-learning workflow for predicting antimicrobial susceptibility phenotypes (MICs or S/I/R) from bacterial whole-genome sequence data. It is designed to compare **rule-based AMR determinant calls** (e.g. AMRFinderPlus) with **statistical/ML prediction**, and to support biological interpretation of resistance architecture.
 
-Demonstration use case: *Acinetobacter baumannii*.
+Demonstration use cases: 
+- Hybrid model building for Carbapenem resistance in *Acinetobacter baumanii* [documentation](https://github.com/Benizao1980/BAMPS-ML/blob/main/docs/workflow.md)
+- Broad spectrum resistance in *Campylobacter jejuni* [TBC](tbc)
 
 ## What this repo does
 
