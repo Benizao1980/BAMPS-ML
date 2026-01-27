@@ -6,14 +6,17 @@ This is a reproducible end-to-end workflow that prioritizes a single path run th
 ## Overview
 
 Inputs:
-- Assemblies: `data/contigs280/` (FASTA contigs; filenames must map to sample IDs)
-- Phenotypes: `data/mic_values.norm.csv` (MIC table; includes imipenem/meropenem etc.)
-- Config: `config/config_ACB_reg.yaml` (regression / MIC modelling)
+- Assemblies: ``data/contigs280/`` (FASTA contigs; filenames must map to sample IDs)
+- Phenotypes: ``data/mic_values.norm.csv`` (MIC table; includes imipenem/meropenem etc.)
+- Config: ``config/config_ACB_reg.yaml`` (regression / MIC modelling)
 
 Download contigs here: 
 
 ```bash
-wget link to dataset contigs on figshare
+cd ~/BAMPY_ML/data
+
+wget -c link to dataset contigs on figshare
+tar -zxfv contigs.russi280.tar.gz
 ```
 
 Outputs:
@@ -49,14 +52,14 @@ data/
 ```
 
 phenotypes.tsv minimum columns:
-- 'sample_id'
+- ``sample_id``
 - one column per antibiotic (either MIC numeric or categorical label)
 
 ---
 # Normalise phenotype calling (optional)
 ---
 
-to ensure the MIC file contains S/I/R labels or that the config defines breakpointing; you have breakpoints.py and CLSI configs
+If MIC tables contain raw values only, BAMPS-ML can derive S/I/R labels using ``breakpoints.py`` and a chosen standard (e.g. CLSI / EUCAST), or per-antibiotic overrides defined in the config.
 
 ---
 # BUILD A MODEL
@@ -80,6 +83,8 @@ python scripts/run_amrfinder.py \
 - outputs/amrfinder/Russia280/amr_presence_absence.norm.tsv (is this produced by default?)
 - outputs/amrfinder/Russia280/raw/*.amrfinder.tsv
 
+The combined feature table uses **sample ID** as the primary key.
+
 ### Step 2A: Train an MIC prediction model (regression; example: imipenem)
 
 The AMRFinder feature table uses sample as the ID column.
@@ -98,6 +103,12 @@ python scripts/train_model.py \
   --self-test
 ```
 
+*Notes*
+- ``--self-test`` performs an internal 75/25 split for quick diagnostics.
+- Use ``--tune`` for hyperparameter optimisation.
+- Use ``--bootstrap-reps`` to quantify uncertainty.
+- On older systems, prefer ``--classifier lgbm`` or ``ridge`` over XGBoost.
+
 ### Step 2B: Train an S/R prediction model (classification; example: imipenem)
 
 ```bash
@@ -113,12 +124,6 @@ python scripts/train_model.py \
   --self-test
 ```
 
-*Notes:*
-- If XGBoost becomes problematic on older glibc systems, use '--classifier lgbm' (preferred) or '--classifier ridge' (regression baseline).
-- '--self-test' holds back 25% of the training split as an inner validation set.
-- Use '--test-size' to control the outer hold-out split fraction.
-- Use '--tune' for randomized hyperparameter search, and '--bootstrap-reps' to quantify uncertainty.
-
 *coming soon*
 - model selection comparisons
 - hyperparameter tuning
@@ -126,47 +131,10 @@ python scripts/train_model.py \
 - bootstraping and propagation of uncertainty
 - fold validation
 
-## Step 3 (optional): Add hybrid features (e.g., PYSEER GWAS output)
-
-### Merge PYSEER GWAS outputs 
-Helper script to merge GWAS outputs from gene presence / absence, SNP and unitigs (kmer) analyses: 'Bens_script' (add link)
-
-```bash
-how to run
-```
-
-### Pass GWAS features directly:
-
-```bash
-python scripts/train_model.py \
-  --feature-table outputs/amrfinder/contigs280/amr_features.tsv \
-  --mic-file data/mic_values.norm.csv \
-  --task regression \
-  --classifier xgb \
-  --gwas-table outputs/gwas/unitigs_matrix.tsv \
-  --gwas-top-k 5000 \
-  --amr-prefix AMR_ \
-  --gwas-prefix GWAS_ \
-  --model-dir outputs/ml_models/imipenem_hybrid_mic \
-  --plot-dir outputs/plots_hybrid/imipenem_hybrid_mic \
-  --random-state 1 \
-  --n-jobs 8 \
-  --self-test
-```
-
 ### Rerun for multiple antibioitcs and feature groups
 
 Add `scripts/run_golden_path.sh`
 A single shell script that reproduces the golden path with variables at the top (so you don’t retype commands).
-
----
-FEATURE DISCOVERY
----
-
-GWAS x3
-Combine
-BLAST in genomes
-Buidling a hybrid model
 
 ---
 # VALIDATE MODEL
@@ -176,7 +144,7 @@ A validation dataset of sequenced genomes, with correspondign MIC data was downl
 
 ![Validation dataset dashboard](../figures/validation_dataset.png)
 
-**Figure X:** Dashbaord overview of validation dataset.
+**Figure X: Dashbaord overview of validation dataset.** The validation dataset includes 672 *A. baumannii* genomes with matched MIC data, primarily from North America, spanning 2004–2023. Assemblies show consistent genome sizes (~3.9 Mb) and encompass diverse Pasteur MLST lineages. Meropenem susceptibility profiles reveal a high prevalence of resistance alongside susceptible isolates, providing a robust and clinically relevant benchmark for evaluating MIC prediction performance, particularly for carbapenems.
 
 This validation step quantifies:
 - Absolute MIC prediction accuracy
@@ -185,12 +153,12 @@ This validation step quantifies:
 - Lineage-specific performance gains
 
 ## Input
-- Validation contigs: `data/contigs_validation_dataset/`
-- Validation phenotypes (MICs): `data/phenotypes_validation/validation_dataset_MIC.csv`
+- Validation contigs: ``data/contigs_validation_dataset/``
+- Validation phenotypes (MICs): ``data/phenotypes_validation/validation_dataset_MIC.csv``
   - Supported formats:
-    - **wide**: one row per sample, MIC columns per antibiotic (e.g., `imipenem`, `meropenem`, ...)
-    - **long**: columns `sample`, `antibiotic`, `mic`
-- Trained models: `outputs/runs/<RUN_NAME>/models/*_regression.pkl`
+    - **wide**: one row per sample, MIC columns per antibiotic (e.g., ``imipenem``, ``meropenem``, ...)
+    - **long**: columns ``sample``, ``antibiotic``, ``mic``
+- Trained models: ``outputs/runs/<RUN_NAME>/models/*_regression.pkl``
 
 You can also download the contigs from here:
 
@@ -231,15 +199,13 @@ python scripts/predict_all.py \
   --panel-out preds/validation_MIC_panel \
   --panel-truth data/phenotypes_validation/validation_dataset_MIC.csv \
   --metrics-out preds/validation_metrics.tsv \
-  --lineage-col lineage \
-  --top-lineages 6
 ```
 
 Outputs: 
-- preds/preds_<antibiotic>_mic.tsv (one per antibiotic)
-- preds/validation_MIC_panel.png + .svg
-- preds/validation_metrics.tsv (per-antibiotic validation metrics)
-- Optional lineage-stratified panels: preds/validation_MIC_panel.lineage_<X>.png + .svg (top N lineages)
+- ``preds/preds_<antibiotic>_mic.tsv`` (one per antibiotic)
+- ``preds/validation_MIC_panel.png`` + ``.svg``
+- ``preds/validation_metrics.tsv`` (per-antibiotic validation metrics)
+- (Optional) lineage-stratified panels: ``preds/validation_MIC_panel.lineage_<X>.png`` + ``.svg`` (top ``N`` lineages)
 
 **Single antibiotic (regression; MIC)**
 
@@ -264,7 +230,7 @@ python scripts/predict.py \
   --output preds/preds_imipenem_SIR.tsv
 ```
 
-### Step C — Score predictions against known validation MICs
+### Step C — Evaluate baseline performance
 The pipeline writes ``preds/validation_metrics.tsv`` with per-antibiotic validation performance.
 
 Minimum “paper-grade” validation metrics per antibiotic:
@@ -274,10 +240,57 @@ Minimum “paper-grade” validation metrics per antibiotic:
 
 These are also auto-embedded into the MIC panel figure annotations (per antibiotic).
 
-## (optional) Compare hybrid models
+This is aour baseline model, which we can evaluate with ``evaluate_mic_predictions``, which produces:
+
+![Model evaluation](../figures/model_evaluation.png)
+
+**Figure X:** Model evaluation.
+
+*Interpretation:*
+The baseline AMRFinder-only model shows:
+- Imipenem: moderate performance but systematic under-prediction of high MICs
+- Meropenem: poor calibration and limited discrimination
+
+This behaviour motivates:
+- hyperparameter tuning, and
+- inclusion of GWAS-derived determinants to capture resistance mechanisms not represented in curated AMR databases.
 
 ---
-# MAKE PREDICTIONS
+FEATURE DISCOVERY (optional)
+---
+
+## Hybrid AMR + GWAS models
+GWAS signals (unitigs, SNPs, gene presence/absence) are integrated alongside AMRFinder features to improve MIC prediction for carbapenems. (e.g., PYSEER GWAS output)
+
+### Merge PYSEER GWAS outputs 
+Helper script to merge GWAS outputs from gene presence / absence, SNP and unitigs (kmer) analyses: 'Bens_script' (add link)
+
+```bash
+how to run
+```
+
+### Pass GWAS features directly:
+
+```bash
+python scripts/train_model.py \
+  --feature-table outputs/amrfinder/contigs280/amr_features.tsv \
+  --gwas-table outputs/gwas/unitigs_matrix.tsv \
+  --gwas-top-k 5000 \
+  --amr-prefix AMR_ \
+  --gwas-prefix GWAS_ \
+  --mic-file data/mic_values.norm.csv \
+  --task regression \
+  --classifier xgb \
+  --model-dir outputs/ml_models/imipenem_hybrid_mic \
+  --plot-dir outputs/plots_hybrid/imipenem_hybrid_mic \
+  --random-state 1 \
+  --self-test
+```
+
+## Compare hybrid models
+
+---
+# MAKE GLOBAL PREDICTIONS
 ---
 
 Prediction dataset: pubMLST (add link)
