@@ -1,29 +1,6 @@
-# BAMPS-ML example workflow (used in Pascoe & Mourkas et al.)
+# BAMPS-ML example workflow: hybrid model building for Carbapenem resistance in *A. baumanii*
 
-Detailed workflow to use **BAMPS-ML** to predict antimicrobial susceptibility profiles and MIC values from genomic data, as desceribed in **Pascoe & Mourkas *et al.* (TBC)** 
-This is a reproducible end-to-end workflow that prioritizes a single path run that can be extended to additional antibiotics and feature sets.
-
-## Overview
-
-Inputs:
-- Assemblies: ``data/contigs280/`` (FASTA contigs; filenames must map to sample IDs)
-- Phenotypes: ``data/mic_values.norm.csv`` (MIC table; includes imipenem/meropenem etc.)
-- Config: ``config/config_ACB_reg.yaml`` (regression / MIC modelling)
-
-Download contigs here: 
-
-```bash
-cd ~/BAMPY_ML/data
-
-wget -c link to dataset contigs on figshare
-tar -zxfv contigs.russi280.tar.gz
-```
-
-Outputs:
-- Trained models per antibiotic (and per feature-set)
-- Benchmarking metrics (ROC/AUC, PR-AUC, calibration, confusion matrices)
-- Interpretation outputs (top features, SHAP summaries)
-- Reproducible run folder with configs and logs
+Detailed workflow to use **BAMPS-ML** to predict antimicrobial susceptibility profiles and MIC values from genomic data, as desceribed in **Pascoe & Mourkas *et al.* (TBC)** This is a reproducible end-to-end workflow that prioritises a single path run that can be extended to additional antibiotics and feature sets.
 
 ## Environment
 Option A: conda (recommended)
@@ -56,14 +33,41 @@ phenotypes.tsv minimum columns:
 - one column per antibiotic (either MIC numeric or categorical label)
 
 ---
-# Normalise phenotype calling (optional)
+# DATASET
 ---
 
+Download contigs here: 
+
+```bash
+cd ~/BAMPY_ML/data
+
+wget -c link to dataset contigs on figshare
+tar -zxfv contigs.russi280.tar.gz
+```
+
+
+## Normalise phenotype calling (optional)
+
 If MIC tables contain raw values only, BAMPS-ML can derive S/I/R labels using ``breakpoints.py`` and a chosen standard (e.g. CLSI / EUCAST), or per-antibiotic overrides defined in the config.
+
+```bash
+insert
+```
 
 ---
 # BUILD A MODEL
 ---
+
+Inputs:
+- Assemblies: ``data/contigs280/`` (FASTA contigs; filenames must map to sample IDs)
+- Phenotypes: ``data/mic_values.norm.csv`` (MIC table; includes imipenem/meropenem etc.)
+- Config: ``config/config_ACB_reg.yaml`` (regression / MIC modelling)
+
+Outputs:
+- Trained models per antibiotic (and per feature-set)
+- Benchmarking metrics (ROC/AUC, PR-AUC, calibration, confusion matrices)
+- Interpretation outputs (top features, SHAP summaries)
+- Reproducible run folder with configs and logs
 
 ## Feature extraction
 
@@ -79,9 +83,9 @@ python scripts/run_amrfinder.py \
 ```
 
 **OUTPUTS:** This produces individual files per genome and a combined AMR feature table in the output directory 
-- outputs/amrfinder/Russia280/amr_presence_absence.tsv
-- outputs/amrfinder/Russia280/amr_presence_absence.norm.tsv (is this produced by default?)
-- outputs/amrfinder/Russia280/raw/*.amrfinder.tsv
+- ``outputs/amrfinder/Russia280/amr_presence_absence.tsv``
+- ``outputs/amrfinder/Russia280/amr_presence_absence.norm.tsv``
+- ``outputs/amrfinder/Russia280/raw/*.amrfinder.tsv``
 
 The combined feature table uses **sample ID** as the primary key.
 
@@ -125,16 +129,65 @@ python scripts/train_model.py \
 ```
 
 *coming soon*
-- model selection comparisons
-- hyperparameter tuning
 - refinement for under / oversampling
 - bootstraping and propagation of uncertainty
 - fold validation
 
-### Rerun for multiple antibioitcs and feature groups
+### Rerun for multiple antibioitcs
 
-Add `scripts/run_golden_path.sh`
-A single shell script that reproduces the golden path with variables at the top (so you don’t retype commands).
+The script ``scripts/run_golden_path.sh`` reproduces the model building path with variables at the top (i.e. run for additional antibiotics). Including the flag ``--all`` buidls models or all antibioitcs included as columns in your input phenotype file.
+
+```bash
+insert
+```
+
+### Self test evaluation
+
+``Add detail``
++ confusion matrices
+  
+*Interpretation: The baseline AMRFinder-only model shows moderate performance but systematic under-prediction of high MICs. This behaviour motivates hyperparameter tuning, and retraining.*
+
+---
+# MODEL TUNING AND RETRAINING
+---
+
+The model can be tuned using different ML classifiers and a selection (xgBoost, LGMboost, ridge, linear regression) of common hyperparameter values using ``tune_model.py``
+
+```bash
+python scripts/tune_model.py \
+  --feature-table outputs/amrfinder/Russia280/amr_presence_absence.norm.tsv \
+  --mic-file data/mic_values.norm.csv \
+  --task regression \
+  --classifier xgb \
+  --antibiotics imipenem meropenem \
+  --log2 \
+  --n-iter 80 \
+  --cv 5 \
+  --n-jobs 8 \
+  --outdir outputs/tuning/imi_mer_xgb_log2
+```
+
+This produces:
+- ``tuning/summary.tsv``
+- ``tuning/cv_results_<antibiotic>.tsv``
+- ``models/<antibiotic>__<task>__<classifier>.pkl``
+- ``models/<antibiotic>__...__metadata.yaml``
+
+And we can retrain our model using --tune to select a tuned model, or --best to choose the best performing model from summary.tsv
+
+```bash
+python scripts/train_model.py \
+  --feature-table outputs/amrfinder/Russia280/amr_presence_absence.norm.tsv \
+  --mic-file data/mic_values.norm.csv \
+  --task classification \
+  --classifier xgb \
+  --model-dir outputs/ml_models/imipenem_amrfinder_SIR \
+  --plot-dir outputs/plots/imipenem_amrfinder_SIR \
+  --random-state 1 \
+  --n-jobs 8 \
+  --self-test
+```
 
 ---
 # VALIDATE MODEL
@@ -144,7 +197,7 @@ A validation dataset of sequenced genomes, with correspondign MIC data was downl
 
 ![Validation dataset dashboard](../figures/validation_dataset.png)
 
-**Figure X: Dashbaord overview of validation dataset.** The validation dataset includes 672 *A. baumannii* genomes with matched MIC data, primarily from North America, spanning 2004–2023. Assemblies show consistent genome sizes (~3.9 Mb) and encompass diverse Pasteur MLST lineages. Meropenem susceptibility profiles reveal a high prevalence of resistance alongside susceptible isolates, providing a robust and clinically relevant benchmark for evaluating MIC prediction performance, particularly for carbapenems.
+**Figure 1: Dashbaord overview of validation dataset.** The validation dataset includes 672 *A. baumannii* genomes with matched MIC data, primarily from North America, spanning 2004–2023. Assemblies show consistent genome sizes (~3.9 Mb) and encompass diverse Pasteur MLST lineages. Meropenem susceptibility profiles reveal a high prevalence of resistance alongside susceptible isolates, providing a robust and clinically relevant benchmark for evaluating MIC prediction performance, particularly for carbapenems.
 
 This validation step quantifies:
 - Absolute MIC prediction accuracy
@@ -152,13 +205,10 @@ This validation step quantifies:
 - Added value of GWAS-derived determinants
 - Lineage-specific performance gains
 
-## Input
-- Validation contigs: ``data/contigs_validation_dataset/``
-- Validation phenotypes (MICs): ``data/phenotypes_validation/validation_dataset_MIC.csv``
-  - Supported formats:
-    - **wide**: one row per sample, MIC columns per antibiotic (e.g., ``imipenem``, ``meropenem``, ...)
-    - **long**: columns ``sample``, ``antibiotic``, ``mic``
-- Trained models: ``outputs/runs/<RUN_NAME>/models/*_regression.pkl``
+## Download data an clean input
+Download contig files and correspondign phenotype data from the *A. baumanii* IOI collection:
+
+![Export contig files for download](link)
 
 You can also download the contigs from here:
 
@@ -168,6 +218,22 @@ cd /<your_location>/BAMPS_ML/data
 wget -c https://figshare.com/ndownloader/files/61226248?private_link=5e5b1065edad79c38c3a
 tar -zxfv contigs_validation.tar.gz
 ```
+
+![Export MIC data for download](link)
+
+Check and clean data formats:
+
+```
+insert
+```
+
+## Inputs
+- Validation contigs: ``data/contigs_validation_dataset/``
+- Validation phenotypes (MICs): ``data/phenotypes_validation/validation_dataset_MIC.csv``
+  - Supported formats:
+    - **wide**: one row per sample, MIC columns per antibiotic (e.g., ``imipenem``, ``meropenem``, ...)
+    - **long**: columns ``sample``, ``antibiotic``, ``mic``
+- Trained models: ``outputs/runs/<RUN_NAME>/models/*_regression.pkl``
 
 The plotting/metrics script auto-detects wide vs long and standardises internally.
 
