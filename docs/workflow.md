@@ -1,4 +1,4 @@
-# BAMPS-ML example workflow: hybrid model building for Carbapenem resistance in *A. baumanii*
+# Hybrid model building for Carbapenem resistance in *A. baumanii*
 
 Detailed workflow to use **BAMPS-ML** to predict antimicrobial susceptibility profiles and MIC values from genomic data, as desceribed in **Pascoe & Mourkas *et al.* (TBC)** This is a reproducible end-to-end workflow that prioritises a single path run that can be extended to additional antibiotics and feature sets.
 
