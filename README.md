@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="bampsml_logo_variantB_ladder.svg" width="360" alt="BAMPS-ML logo">
+</p>
+
 # BAMPS-ML
 
 **BAMPS-ML** is a reproducible machine-learning workflow for predicting antimicrobial susceptibility phenotypes (MICs or S/I/R) from bacterial whole-genome sequence data. It is designed to compare **rule-based AMR determinant calls** (e.g. AMRFinderPlus) with **statistical/ML prediction**, and to support biological interpretation of resistance architecture.
