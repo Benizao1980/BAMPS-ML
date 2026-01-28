@@ -4,74 +4,136 @@
 
 # BAMPS-ML
 
-**BAMPS-ML** is a reproducible machine-learning workflow for predicting antimicrobial susceptibility phenotypes (MICs or S/I/R) from bacterial whole-genome sequence data. It is designed to compare **rule-based AMR determinant calls** (e.g. AMRFinderPlus) with **statistical/ML prediction**, and to support biological interpretation of resistance architecture.
+*Interpretable prediction of antimicrobial resistance phenotypes from bacterial genomes.*
 
-Demonstration use cases: 
-- Hybrid model building for Carbapenem resistance in *Acinetobacter baumanii* [documentation](https://github.com/Benizao1980/BAMPS-ML/blob/main/docs/workflow.md)
-- Broad spectrum resistance in *Campylobacter jejuni* [TBC](tbc)
+BAMPS-ML is a framework for predicting antimicrobial resistance phenotypes (MICs or S/I/R)
+from whole-genome sequence data, with an explicit focus on **biological interpretation**.
 
-## What this repo does
+The starting assumption is that resistance phenotypes rarely arise from single genes in
+isolation. In practice, they reflect interactions between **known resistance determinants,
+genetic background, and population structure**. Models that ignore this context may perform
+well under cross-validation while remaining difficult to interpret or generalise.
 
-* Builds feature matrices from one or more genomic “views”:
+BAMPS-ML is designed to keep those constraints visible.
 
-  * **AMR determinants** (AMRFinderPlus) ✅
-  * Gene content / annotations (Bakta / pangenome) *(optional; in progress)*
-  * Genome-wide variation (unitigs / GWAS matrices) *(optional; in progress)*
-* Trains models for:
+---
 
-  * **Regression** (MIC prediction; log2 MIC internally)
-  * **Classification** (S/I/R; via breakpoint mapping)
-* Produces auditable run artefacts:
+## Where this fits
 
-  * per-antibiotic models (`*.pkl`)
-  * per-antibiotic plots (`*.png`)
-  * `training_summary.tsv`, logs, environment snapshot
+BAMPS-ML is part of a connected analytical programme:
+
+- **PANOPTICON** explores population structure, gene content, and ecological signal
+- **SourceRunnerML** uses that structure to infer likely sources of infection
+- **BAMPS-ML** applies the same philosophy to resistance phenotypes
+
+Together, these tools support a workflow that moves from  
+**population structure → transmission inference → phenotype prediction**, while making
+lineage effects and uncertainty explicit at each stage.
+
+---
+
+## What BAMPS-ML actually does
+
+At a practical level, BAMPS-ML builds and evaluates resistance prediction models using one
+or more complementary genomic “views”.
+
+Feature matrices can be derived from:
+
+- **AMR determinants** (via AMRFinderPlus)
+- Gene content and functional annotation (Bakta / pangenome) *(optional; in progress)*
+- Genome-wide sequence variation (unitigs / GWAS matrices) *(optional; in progress)*
+
+These feature sets can be used independently or combined, depending on the question being
+asked.
+
+For each antibiotic, BAMPS-ML supports:
+
+- **Regression** models  
+  (MIC prediction; MICs are internally transformed to log₂ scale)
+
+- **Classification** models  
+  (S/I/R prediction via breakpoint mapping)
+
+Models are trained **per antibiotic**, reflecting the fact that resistance architecture,
+label availability, and uncertainty often differ substantially across drugs.
+
+---
+
+## Reproducible outputs
+
+Each run produces a complete, auditable record, including:
+
+- per-antibiotic trained models (`*.pkl`)
+- per-antibiotic evaluation plots (`*.png`)
+- `training_summary.tsv` summarising performance and sample sizes
+- logs and software/environment snapshots
+
+Outputs are written to a self-contained run directory:
+
+outputs/runs/<run_id>/
+
+
+This directory contains everything required to reproduce or audit a given analysis.
+
+---
 
 ## Repository layout
 
-* `scripts/` : CLI entrypoints (feature building, training, prediction, plotting)
-* `bamps_ml/` : core library modules
-* `data/` : example datasets (not distributed publicly unless stated)
-* `outputs/` : generated outputs
+- `scripts/`  
+  Command-line entry points for feature construction, training, prediction, and plotting
 
-  * `outputs/runs/<run_id>/` stores a complete reproducible run (models, plots, logs, versions)
+- `bamps_ml/`  
+  Core library modules
 
-## Quick start (AMRFinder → MIC panel training)
+- `data/`  
+  Example datasets (not distributed publicly unless explicitly stated)
 
-This “golden path” builds AMRFinder features and trains **one model per antibiotic column** found in `data/mic_values.norm.csv` (after dropping missing labels per antibiotic).
+- `outputs/`  
+  Generated outputs, organised by run
+
+---
+
+## Quick start
+
+### AMRFinder → MIC panel training
+
+This “golden path” builds AMRFinder-based features and trains **one model per antibiotic
+column** found in `data/mic_values.norm.csv` (after dropping isolates with missing labels
+for each antibiotic).
 
 ```bash
 conda activate BAMPY
 scripts/run_golden_path.sh
 ```
 
-Outputs are written to `outputs/runs/.../` including:
+Outputs include:
+- `models/<antibiotic>_regression.pkl`
+- `plots/<antibiotic>_regression.png`
+- `models/training_summary.tsv`
+- `logs/*.log, versions.txt, run_meta.txt`
 
-* `models/<antibiotic>_regression.pkl`
-* `plots/<antibiotic>_regression.png`
-* `models/training_summary.tsv`
-* `logs/*.log`, `versions.txt`, `run_meta.txt`
+Documentation
+A detailed end-to-end workflow is provided in:
+```
+docs/WORKFLOW.md
+```
+(data layout → feature extraction → training → evaluation → interpretation)
 
-## Documentation
+Status
+This repository contains code and documentation used for the A. baumannii AMR prediction
+study (Pascoe & Mourkas et al., in preparation).
 
-* End-to-end workflow: `docs/WORKFLOW.md` (data layout → feature extraction → training → evaluation → interpretation)
+The codebase is actively being cleaned and documented. Optional feature views (gene
+content, unitigs/GWAS, mobile element context) are present but may still be under
+refinement.
 
-## Status
+*Notes*
+### Antibiotic panel behaviour
+Training is performed per antibiotic column after dropping isolates with missing
+labels. As a result, a single run produces multiple trained models alongside
+`training_summary.tsv`.
 
-This repository contains code and documentation used for the *A. baumannii* AMR prediction study (Pascoe & Mourkas et al., in preparation). It is actively being cleaned and documented; optional feature views (gene content, unitigs/GWAS, mobile elements) are present but may still be under refinement.
-
-## Known issues / platform notes
-
-* **XGBoost on older glibc (e.g. Puma)**
-  You may see a warning that your system has `glibc < 2.28` and that future XGBoost wheels may stop supporting it.
-
-  * This is a *warning*, not an error, but it may become a breaking issue with future XGBoost releases.
-  * Recommended workaround on older systems: use `--classifier lgbm` (LightGBM) or `--classifier ridge` for regression baselines.
-  * If you need XGBoost specifically, pin to a compatible version in your environment (e.g. via conda), and record versions in `outputs/runs/<run>/versions.txt`.
-
-* **Antibiotic “panel” behaviour**
-  `scripts/train_model.py` trains **one model per antibiotic column** in the MIC/phenotype table (after dropping missing labels per antibiotic).
-  This is why a single run produces multiple `*_regression.pkl` files plus `training_summary.tsv`.
-
-* **Label sparsity drives performance**
-  Some antibiotics may have substantially fewer usable labels (e.g. tobramycin), which will reduce stability and inflate uncertainty. Always report `n` per antibiotic (captured in `training_summary.tsv`).
+### Label sparsity
+Some antibiotics have substantially fewer usable labels, which can reduce model stability
+and inflate uncertainty. Always report sample sizes per antibiotic, as captured in
+`training_summary.tsv`.
