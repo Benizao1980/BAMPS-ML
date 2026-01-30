@@ -152,6 +152,7 @@ insert
 # MODEL TUNING AND RETRAINING
 ---
 
+We tune hyperparameters on the *training dataset only* (Russia280). 
 The model can be tuned using different ML classifiers and a selection (xgBoost, LGMboost, ridge, linear regression) of common hyperparameter values using ``tune_model.py``
 
 ```bash
@@ -240,6 +241,7 @@ The plotting/metrics script auto-detects wide vs long and standardises internall
 ### Step A — Build AMRFinder features for validation contigs
 
 ```bash
+# Build validation AMRFinder features
 python scripts/run_amrfinder.py \
   --genome-dir data/contigs_validation_dataset \
   --output-dir outputs/amrfinder/validation \
@@ -256,15 +258,16 @@ This produces (example):
 This writes one tidy TSV per antibiotic (prefixed ``preds_...``) and generates MIC panel plots.
 
 ```bash
+# Predict on validation set (tuned models)
 python scripts/predict_all.py \
   --feature-table outputs/amrfinder/validation/amr_presence_absence.tsv \
-  --model-dir outputs/runs/001_Russia280_AMRFinder_MIC_panel_xgb/models \
-  --outdir preds \
+  --model-dir outputs/runs/002_Russia280_AMRFinder_IMI_MER_xgb_tuned/models \
+  --outdir preds/validation_tuned \
   --tasks regression \
-  --to-mic \
-  --panel-out preds/validation_MIC_panel \
+  --panel-out preds/validation_tuned/MIC_panel \
+  --panel-order imipenem meropenem \
   --panel-truth data/phenotypes_validation/validation_dataset_MIC.csv \
-  --metrics-out preds/validation_metrics.tsv \
+  --panel-truth-id-col id
 ```
 
 Outputs: 
@@ -297,6 +300,16 @@ python scripts/predict.py \
 ```
 
 ### Step C — Evaluate baseline performance
+# Evaluate vs truth
+```bash
+python scripts/evaluate_mic_predictions.py \
+  --pred preds/validation_tuned/preds_*_mic.tsv \
+  --truth data/phenotypes_validation/validation_dataset_MIC.csv \
+  --outdir preds/validation_tuned/eval \
+  --truth-id-col id \
+  --make-plots
+  ```
+
 The pipeline writes ``preds/validation_metrics.tsv`` with per-antibiotic validation performance.
 
 Minimum “paper-grade” validation metrics per antibiotic:
@@ -304,22 +317,16 @@ Minimum “paper-grade” validation metrics per antibiotic:
 - MAE in log2 units (average error in dilution steps)
 - Within ±1 dilution accuracy (clinically intuitive)
 
-These are also auto-embedded into the MIC panel figure annotations (per antibiotic).
-
-This is aour baseline model, which we can evaluate with ``evaluate_mic_predictions``, which produces:
+Alternatively, run all tuning and retrainign stesp by using: 
+```bash
+tbc
+```
 
 ![Model evaluation](../figures/model_evaluation.png)
 
 **Figure X:** Model evaluation.
 
-*Interpretation:*
-The baseline AMRFinder-only model shows:
-- Imipenem: moderate performance but systematic under-prediction of high MICs
-- Meropenem: poor calibration and limited discrimination
-
-This behaviour motivates:
-- hyperparameter tuning, and
-- inclusion of GWAS-derived determinants to capture resistance mechanisms not represented in curated AMR databases.
+*Interpretation:* On the external validation set, tuned AMRFinder-only models show clear separation between low and high MICs for both carbapenems, with improved fit compared to baseline. Residual plots indicate remaining systematic error at the highest MICs (notably for imipenem), suggesting additional genetic determinants beyond curated AMR calls—motivating hybrid AMR+GWAS feature models.
 
 ---
 FEATURE DISCOVERY (optional)
