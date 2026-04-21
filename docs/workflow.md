@@ -332,35 +332,115 @@ tbc
 FEATURE DISCOVERY (optional)
 ---
 
-## Hybrid AMR + GWAS models
-GWAS signals (unitigs, SNPs, gene presence/absence) are integrated alongside AMRFinder features to improve MIC prediction for carbapenems. (e.g., PYSEER GWAS output)
+## GWAS feature construction
+To capture genetic determinants not represented in curated AMR databases, we incorporate GWAS-derived unitigs and collapse them into biologically interpretable locus-level features.
 
-### Merge PYSEER GWAS outputs 
-Helper script to merge GWAS outputs from gene presence / absence, SNP and unitigs (kmer) analyses: 'Bens_script' (add link)
+### Step 1 — Combine GWAS hits
+
+Merge GWAS outputs (e.g. imipenem, meropenem):
 
 ```bash
-how to run
+python scripts/build_unitig_to_locus.py \
+  --inputs IMI_hits.csv MER_hits.csv \
+  --labels IMI MER \
+  --out-prefix gwas_combined
 ```
 
-### Pass GWAS features directly:
+Outputs:
+
+```
+gwas_combined_unitig_to_locus.tsv
+gwas_combined_locus_summary.tsv
+```
+
+### Step 2 — Build GWAS unitig FASTA
+
+```bash
+python scripts/build_gwas_fasta.py \
+  --inputs IMI_hits.csv MER_hits.csv \
+  --out combined_gwas_unitigs_unique.fasta \
+  --deduplicate
+```
+
+### Step 3 — Screen genomes for GWAS unitigs
+
+```bash
+python scripts/screen_unitigs_in_genomes.py \
+  --unitigs combined_gwas_unitigs_unique.fasta \
+  --genome-dir data/contigs280 \
+  --out-prefix outputs/gwas/gwas_features_russia280 \
+  --threads 8
+```
+
+Output:
+```
+*_presence_absence.tsv (unitig-level matrix)
+```
+
+### Step 4 — Convert unitigs to locus-level features
+
+```bash
+python scripts/build_matrix_compatible_mapping.py \
+  --fasta combined_gwas_unitigs_unique.fasta \
+  --mapping gwas_combined_unitig_to_locus.tsv \
+  --out gwas_matrix_compatible_mapping.tsv
+```
+
+```bash
+python scripts/collapse_unitig_matrix_to_loci.py \
+  --matrix outputs/gwas/gwas_features_russia280_presence_absence.tsv \
+  --mapping gwas_matrix_compatible_mapping.tsv \
+  --out-prefix outputs/gwas/gwas_features_russia280
+```
+
+Output:
+
+```
+*_locus_presence_absence.tsv
+```
+
+This reduces high-dimensional unitig space into:
+- interpretable genomic loci
+- robust, non-redundant features
+
+### Step 5 — Build hybrid feature matrix
+
+Combine AMR + GWAS features:
+
+```bash
+python scripts/merge_feature_tables.py \
+  --amr outputs/amrfinder/Russia280/amr_presence_absence.norm.tsv \
+  --gwas outputs/gwas/gwas_features_russia280_locus_presence_absence.tsv \
+  --out outputs/features/hybrid_russia280.tsv
+```
+
+---
+# EVALUATE HYBRID MODELS
+---
 
 ```bash
 python scripts/train_model.py \
-  --feature-table outputs/amrfinder/contigs280/amr_features.tsv \
-  --gwas-table outputs/gwas/unitigs_matrix.tsv \
-  --gwas-top-k 5000 \
-  --amr-prefix AMR_ \
-  --gwas-prefix GWAS_ \
-  --mic-file data/mic_values.norm.csv \
+  --feature-table outputs/features/hybrid_validation.tsv \
+  --mic-file data/phenotypes_validation/validation_dataset_MIC.csv \
   --task regression \
   --classifier xgb \
-  --model-dir outputs/ml_models/imipenem_hybrid_mic \
-  --plot-dir outputs/plots_hybrid/imipenem_hybrid_mic \
-  --random-state 1 \
+  --model-dir outputs/ml_models/imipenem_hybrid \
+  --plot-dir outputs/plots/imipenem_hybrid \
   --self-test
 ```
 
-## Compare hybrid models
+
+![Hybrid Model evaluation](../figures/hybrid_model_evaluation.png)
+
+**Figure 4:** GWAS-informed hybrid models improve carbapenem MIC prediction
+
+(A) Baseline AMRFinder-only model performance shows high specificity but reduced sensitivity for elevated MICs.
+(B) GWAS-derived loci capture additional genomic variation associated with resistance.
+(C) Hybrid models integrating AMR determinants and GWAS loci significantly improve prediction accuracy, particularly for high MIC isolates.
+(D) Error distribution (log2 MIC) demonstrates reduced systematic underprediction in hybrid models.
+
+*Interpretation:*
+While curated AMR determinants capture canonical resistance mechanisms, GWAS-derived loci reveal additional genetic signals—likely reflecting regulatory variation, compensatory mutations, and lineage-specific adaptations. Integrating these signals improves predictive performance and highlights the polygenic architecture of carbapenem resistance in *A. baumannii*.
 
 ---
 # MAKE GLOBAL PREDICTIONS
@@ -378,25 +458,6 @@ Download contigs here:
 ```bash
 wget link to dataset contigs on figshare
 ```
-
-## Use constructed model to make predictions 
-
-Using prediction script
-
-```bash
-how to run it
-```
-
-## Outputs:
--
--
--
-
-Breakdown outputs by metadata (country, host, etc.)
-Self test?
-Metrics
-
-## (optional) Compare hybrid models
 
 ---
 
