@@ -18,20 +18,6 @@ BAMPS-ML is designed to keep those constraints visible.
 
 ---
 
-## Where this fits
-
-BAMPS-ML is part of a connected analytical programme:
-
-- **PANOPTICON** explores population structure, gene content, and ecological signal
-- **SourceRunnerML** uses that structure to infer likely sources of infection
-- **BAMPS-ML** applies the same philosophy to resistance phenotypes
-
-Together, these tools support a workflow that moves from  
-**population structure → transmission inference → phenotype prediction**, while making
-lineage effects and uncertainty explicit at each stage.
-
----
-
 ## What BAMPS-ML actually does
 
 At a practical level, BAMPS-ML builds and evaluates resistance prediction models using one
@@ -71,7 +57,6 @@ Each run produces a complete, auditable record, including:
 Outputs are written to a self-contained run directory:
 
 outputs/runs/<run_id>/
-
 
 This directory contains everything required to reproduce or audit a given analysis.
 
@@ -120,7 +105,7 @@ docs/WORKFLOW.md
 (data layout → feature extraction → training → evaluation → interpretation)
 
 Status
-This repository contains code and documentation used for the A. baumannii AMR prediction
+This repository contains code and documentation used for the *A. baumannii* AMR prediction
 study (Pascoe & Mourkas et al., in preparation).
 
 The codebase is actively being cleaned and documented. Optional feature views (gene
